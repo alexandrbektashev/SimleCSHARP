@@ -1,69 +1,102 @@
 ﻿using System;
 using System.Collections.Generic;
 using NDesk.Options;
-
+using Microsoft.Win32;
+using System.IO;
 
 namespace TrialProgr
 {
     class Program
     {
-        static int verbosity;
+        const string regPath = "HKEY_CURRENT_USER\\Software\\trialProgram\\";
+        const string regUntilDateKey = "Until";
+        const string regSinceDateKey = "Since";
+        const string regFlagIsTimesOrDate = "Flag";
+        const string regTimesLeft = "Left";
+        const string regTimesUsed = "Used";
+        const string regHash = "Hash";
+
+        const int times = 5;
+        const double usingTime = 2;
+
+        static string progrPath = "MyLittleProgram.exe";
+        static string progrDest = "C:\\";
+        static bool DateOrTimes;
+
 
         public static void Main(string[] args)
         {
             bool show_help = false;
-            List<string> names = new List<string>();
-            int repeat = 1;
 
             var p = new OptionSet() {
-            { "n|name=", "the {NAME} of someone to greet.",
-              v => names.Add (v) },
-            { "r|repeat=",
-                "the number of {TIMES} to repeat the greeting.\n" +
-                    "this must be an integer.",
-              (int v) => repeat = v },
-            { "v", "increase debug message verbosity",
-              v => { if (v != null) ++verbosity; } },
-            { "h|help",  "show this message and exit",
-              v => show_help = v != null },
-        };
+            { "p|path=", "the {NAME} to rpogram to instal trial.", v => progrPath = v },
+           // { "r|repeat=", "this must be an integer.", (int v) => repeat = v },
+            { "t|type=", "trial type: date or times", v => {
+                if (v == "date") DateOrTimes = true;
+            else if (v == "times") DateOrTimes = false;
+            else throw new OptionException("Wrong parameter value", "t|type="); } },
+            { "h|help",  "show this message and exit", v => show_help = v != null }
+            };
 
             List<string> extra;
+
             try
             {
                 extra = p.Parse(args);
             }
             catch (OptionException e)
             {
-                Console.Write("greet: ");
                 Console.WriteLine(e.Message);
                 Console.WriteLine("Try `greet --help' for more information.");
                 return;
             }
+            try
+            {
+                if (progrPath != "")
+                {
+                    //sets values that will be used to protect future program
+                    //the opposite force is in the class verifier
+                    Registry.SetValue(regPath, regFlagIsTimesOrDate, DateOrTimes);
+                    if (DateOrTimes)
+                    {
+                        DateTime now = DateTime.Now;
+                        DateTime until = now.AddMinutes(usingTime);
 
+                        long nowbin = now.ToBinary();
+                        long untilbin = until.ToBinary();
+                        long hash = untilbin - nowbin;
+
+                        hash = hash.GetHashCode();
+
+                        Registry.SetValue(regPath, regSinceDateKey, nowbin);
+                        Registry.SetValue(regPath, regUntilDateKey, untilbin);
+                        Registry.SetValue(regPath, regHash, hash);
+                    }
+                    else
+                    {
+                        int used = 0;
+                        int left = used + times;
+
+                        int hash = (left + used).GetHashCode();
+
+                        Registry.SetValue(regPath, regTimesUsed, used);
+                        Registry.SetValue(regPath, regTimesLeft, left);
+                        Registry.SetValue(regPath, regHash, hash);
+                    }
+                }
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                Console.Read();
+            }
             if (show_help)
             {
                 ShowHelp(p);
                 return;
             }
-
-            string message;
-            if (extra.Count > 0)
-            {
-                message = string.Join(" ", extra.ToArray());
-                Debug("Using new message: {0}", message);
-            }
-            else
-            {
-                message = "Hello {0}!";
-                Debug("Using default message: {0}", message);
-            }
-
-            foreach (string name in names)
-            {
-                for (int i = 0; i < repeat; ++i)
-                    Console.WriteLine(message, name);
-            }
+            Console.Read();
         }
 
         static void ShowHelp(OptionSet p)
@@ -74,15 +107,6 @@ namespace TrialProgr
             Console.WriteLine();
             Console.WriteLine("Options:");
             p.WriteOptionDescriptions(Console.Out);
-        }
-
-        static void Debug(string format, params object[] args)
-        {
-            if (verbosity > 0)
-            {
-                Console.Write("# ");
-                Console.WriteLine(format, args);
-            }
         }
     }
 }
